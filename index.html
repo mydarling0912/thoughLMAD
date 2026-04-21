@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Monty Hall - Math Edition 2.1 (MC Update)</title>
+    <style>
+        :root { --primary: #2c3e50; --accent: #e74c3c; --gold-color: #f1c40f; --win: #27ae60; --blue: #0984e3; --metal-gold: #d4af37; --mc-color: #f39c12; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #dfe6e9; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; overflow-x: hidden; }
+        .container { width: 95%; max-width: 950px; background: white; padding: 40px; border-radius: 30px; box-shadow: 0 20px 50px rgba(0,0,0,0.15); text-align: center; position: relative; }
+        
+        /* --- TÂN TRANG 3 CÁNH CỬA --- */
+        .doors-container { display: flex; justify-content: center; gap: 30px; margin: 40px 0; }
+        .door-box { position: relative; width: 180px; height: 280px; cursor: pointer; border-radius: 15px; overflow: hidden; box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+        .door { 
+            width: 100%; height: 100%; background: #8b4513; border: 6px solid var(--metal-gold); border-radius: 15px; 
+            display: flex; align-items: center; justify-content: center; font-size: 60px; color: white; font-weight: bold;
+            z-index: 2; position: absolute; transform-origin: center;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Ctext x='50%' y='50%' font-size='80' fill='rgba(255,255,255,0.1)' text-anchor='middle'%3Eπ Σ √ ∞ ∫%3C/text%3E%3C/svg%3E");
+            background-size: 150px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            transition: all 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .door.open { transform: scale(0.1) rotateY(180deg); opacity: 0; pointer-events: none; }
+        .door:hover:not(.open) { transform: translateY(-5px); box-shadow: 0 8px 20px rgba(212, 175, 55, 0.4); }
+        .door.selected { border-color: var(--gold-color); box-shadow: 0 0 40px var(--gold-color); }
+        .content { 
+            position: absolute; width: 100%; height: 100%; display: flex; align-items: center; 
+            justify-content: center; background: radial-gradient(circle, #34495e, #1a252f);
+            border-radius: 15px; z-index: 1; border: 6px solid var(--metal-gold); box-sizing: border-box; padding: 20px;
+        }
+        .car-img { width: 100%; fill: #e74c3c; }
+        .donkey-img { width: 90%; fill: #bdc3c7; }
+        
+        /* Giao diện overlay Bắt đầu */
+        #overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(44, 62, 80, 0.98); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; color: white; text-align: center; }
+        button { padding: 15px 40px; font-size: 18px; cursor: pointer; border-radius: 50px; border: none; background: var(--primary); color: white; transition: 0.3s; font-weight: bold; margin: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        button:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,0.3); }
+        
+        /* Bảng thống kê */
+        .stats-bar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 35px; border-top: 2px solid #eee; padding-top: 25px; }
+        .stat-item { background: #f8f9fa; padding: 15px; border-radius: 15px; }
+        .stat-num { display: block; font-size: 30px; font-weight: 800; color: var(--accent); }
+        #msg { font-size: 1.3rem; min-height: 80px; color: #2d3436; line-height: 1.5; padding: 0 20px; font-weight: 500; }
+
+        /* --- NHÂN VẬT MC ẢO (NEW) --- */
+        #mc-container {
+            position: absolute;
+            bottom: -20px;
+            left: -150px; /* Bắt đầu ẩn bên ngoài */
+            width: 120px;
+            height: 180px;
+            transition: left 1s ease-out; /* Hiệu ứng trượt vào */
+            z-index: 10;
+        }
+        #mc-container.visible { left: 20px; } /* Vị trí khi xuất hiện */
+
+        /* Bong bóng thoại */
+        #mc-bubble {
+            position: absolute;
+            top: -100px;
+            left: 100px;
+            background: white;
+            padding: 15px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            width: 250px;
+            font-size: 1rem;
+            color: #333;
+            text-align: left;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            pointer-events: none;
+        }
+        #mc-bubble::after { /* Mũi tên bong bóng */
+            content: '';
+            position: absolute;
+            bottom: -15px;
+            left: 20px;
+            border-width: 15px 15px 0;
+            border-style: solid;
+            border-color: white transparent transparent;
+        }
+        #mc-bubble.visible { opacity: 1; }
+
+        /* Họa tiết SVG MC thân thiện */
+        .mc-svg { width: 100%; height: 100%; fill: var(--mc-color); }
+        .mc-eye { fill: #333; animation: blink 4s infinite; }
+        @keyframes blink { 0%, 90%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.1); } }
+    </style>
+</head>
+<body>
+
+<div id="overlay">
+    <h1 style="font-size: 4rem; margin-bottom: 0;">🎭 MONTY HALL</h1>
+    <p style="font-size: 1.3rem; opacity: 0.8;">Nhạc nền: <b>Glass_and_Steel.mp3</b> | Phiên bản MC Ảo</p>
+    <button onclick="startGame()" style="background: var(--blue); font-size: 1.6rem; padding: 20px 60px;">BẮT ĐẦU CHƠI</button>
+</div>
+
+<div class="container">
+    <div id="mc-container">
+        <svg class="mc-svg" viewBox="0 0 100 150" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <radialGradient id="gradMc" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+                    <stop offset="0%" style="stop-color:#f1c40f" />
+                    <stop offset="100%" style="stop-color:#f39c12" />
+                </radialGradient>
+            </defs>
+            <circle cx="50" cy="50" r="40" fill="url(#gradMc)"/> <ellipse cx="50" cy="120" rx="30" ry="40" fill="url(#gradMc)"/> <circle class="mc-eye" cx="35" cy="40" r="5"/> <circle class="mc-eye" cx="65" cy="40" r="5"/> <rect id="mc-mouth" x="40" y="65" width="20" height="5" rx="2" fill="#e74c3c"/> </svg>
+        <div id="mc-bubble">Xin chào bạn! Mình là trợ lý ảo của bạn hôm nay.</div>
+    </div>
+
+    <h2 id="instruction" style="color: var(--primary); text-transform: uppercase; letter-spacing: 3px; font-weight: 800;">Chuẩn bị...</h2>
+    
+    <div class="doors-container">
+        <div class="door-box" id="box0" onclick="handlePick(0)"><div id="door0" class="door">1</div><div id="content0" class="content"></div></div>
+        <div class="door-box" id="box1" onclick="handlePick(1)"><div id="door1" class="door">2</div><div id="content1" class="content"></div></div>
+        <div class="door-box" id="box2" onclick="handlePick(2)"><div id="door2" class="door">3</div><div id="content2" class="content"></div></div>
+    </div>
+
+    <p id="msg"></p>
+
+    <div id="decision-controls" style="display:none; margin-bottom: 20px;">
+        <button onclick="resolve(false)" style="background: #7f8c8d;">GIỮ CỬA CŨ</button>
+        <button onclick="resolve(true)" style="background: var(--win);">ĐỔI CỬA MỚI</button>
+    </div>
+
+    <button id="next-btn" style="display:none; background: var(--blue);" onclick="initRound()">LƯỢT TIẾP THEO ➔</button>
+
+    <div class="stats-bar">
+        <div class="stat-item">Thắng khi GIỮ<span class="stat-num" id="s-keep">0</span></div>
+        <div class="stat-item">Thắng khi ĐỔI<span class="stat-num" id="s-switch">0</span></div>
+        <div class="stat-item">Lượt chơi<span class="stat-num" id="s-total">0/10</span></div>
+    </div>
+</div>
+
+<script>
+    // Đồ họa xe hơi Xịn (SVG)
+    const carSvg = `<svg class="car-img" viewBox="0 0 100 60" xmlns="http://www.w3.org/2000/svg"><path d="M5,40 L10,30 C12,25 20,20 30,20 L70,20 C80,20 88,25 90,30 L95,40 C98,45 98,50 95,55 L90,57 C88,58 85,58 83,57 L17,57 C15,58 12,58 10,57 L5,55 C2,50 2,45 5,40 Z" fill="#e74c3c"/><circle cx="20" cy="50" r="7" fill="#333" stroke="#fff" stroke-width="2"/><circle cx="80" cy="50" r="7" fill="#333" stroke="#fff" stroke-width="2"/><rect x="35" y="25" width="30" height="15" fill="#fff" opacity="0.8" rx="2"/></svg>`;
+    
+    // Đồ họa con lừa Xịn (SVG)
+    const donkeySvg = `<svg class="donkey-img" viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg"><path d="M50,110 C60,110 70,100 70,80 L70,50 C70,30 60,20 50,20 C40,20 30,30 30,50 L30,80 C30,100 40,110 50,110 Z" fill="#95a5a6"/><circle cx="40" cy="45" r="5" fill="#333"/><circle cx="60" cy="45" r="5" fill="#333"/><path d="M40,65 C45,70 55,70 60,65" stroke="#333" fill="none" stroke-width="3"/><path d="M25,20 L15,0 L30,10 L30,30 L25,20 Z" fill="#7f8c8d"/><path d="M75,20 L85,0 L70,10 L70,30 L75,20 Z" fill="#7f8c8d"/></svg>`;
+
+    const bgMusic = new Audio('Glass_and_Steel.mp3'); 
+    const sndOpen = new Audio('https://www.soundjay.com/mechanical/door-open-1.mp3');
+    
+    // Quản lý MC và Lời nói
+    const mcBubble = document.getElementById('mc-bubble');
+    const mcMouth = document.getElementById('mc-mouth');
+
+    function speakAI(text, showInBubble = true) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'vi-VN';
+        utterance.rate = 1.0;
+        utterance.onstart = () => { 
+            bgMusic.volume = 0.03; 
+            mcMouth.style.transform = "scaleY(2)"; // Há miệng
+            if (showInBubble) {
+                mcBubble.innerText = text;
+                mcBubble.classList.add('visible');
+            }
+        };
+        utterance.onend = () => { 
+            bgMusic.volume = 0.2; 
+            mcMouth.style.transform = "scaleY(1)"; // Đóng miệng
+            setTimeout(() => mcBubble.classList.remove('visible'), 2000); // Ẩn bong bóng sau 2s
+        };
+        window.speechSynthesis.speak(utterance);
+    }
+
+    let car, picked, total = 0, kWin = 0, sWin = 0, state = 'START';
+
+    function startGame() {
+        document.getElementById('overlay').style.display = 'none';
+        bgMusic.loop = true;
+        bgMusic.volume = 0.2;
+        bgMusic.play().catch(() => console.log("Thiếu file Glass_and_Steel.mp3"));
+
+        // MC xuất hiện và giải thích luật chơi
+        document.getElementById('mc-container').classList.add('visible');
+        const ruleText = "Chào mừng bạn! Luật chơi rất đơn giản: Đằng sau một cánh cửa là Ô tô thể thao, hai cửa còn lại là Lừa. Bạn hãy chọn một cửa, sau đó mình sẽ mở một cửa có lừa và hỏi bạn muốn giữ hay đổi. Chúng ta sẽ chơi 10 lượt nhé! Bây giờ, mời bạn chọn cánh cửa đầu tiên.";
+        speakAI(ruleText);
+        
+        // Chờ MC nói xong (khoảng 15s) rồi mới cho chọn cửa
+        setTimeout(initRound, 16000); 
+    }
+
+    function initRound() {
+        if(total >= 10) return;
+        state = 'PICK';
+        car = Math.floor(Math.random() * 3);
+        
+        document.getElementById('instruction').innerText = `Lượt chơi ${total + 1} / 10`;
+        document.getElementById('msg').innerText = "Chọn cánh cửa bạn tin là có Ô tô thể thao!";
+        document.getElementById('next-btn').style.display = 'none';
+        document.getElementById('decision-controls').style.display = 'none';
+        
+        for(let i=0; i<3; i++) {
+            const d = document.getElementById(`door${i}`);
+            d.classList.remove('open', 'selected');
+            document.getElementById(`content${i}`).innerHTML = (i === car) ? carSvg : donkeySvg;
+        }
+        // Giọng đọc ngắn gọn hơn cho các lượt sau
+        if(total > 0) speakAI(`Lượt chơi thứ ${total + 1}. Mời bạn chọn một cánh cửa.`);
+    }
+
+    function handlePick(i) {
+        if(state !== 'PICK') return;
+        picked = i;
+        state = 'DECIDE';
+        document.getElementById(`door${i}`).classList.add('selected');
+
+        let goat = [0,1,2].filter(d => d !== car && d !== picked)[0];
+        
+        setTimeout(() => {
+            sndOpen.play();
+            document.getElementById(`door${goat}`).classList.add('open');
+            const txt = `Cửa số ${goat+1} là chú lừa. Bạn muốn giữ cửa ${picked+1} hay quyết định đổi cửa?`;
+            document.getElementById('msg').innerHTML = txt;
+            document.getElementById('decision-controls').style.display = 'block';
+            speakAI(txt);
+        }, 1000);
+    }
+
+    function resolve(isSwitch) {
+        state = 'END';
+        document.getElementById('decision-controls').style.display = 'none';
+        let final = picked;
+        
+        if(isSwitch) {
+            final = [0,1,2].filter(i => i !== picked && i !== ([0,1,2].filter(d => d !== car && d !== picked)[0]))[0];
+            document.querySelectorAll('.door').forEach(d => d.classList.remove('selected'));
+            document.getElementById(`door${final}`).classList.add('selected');
+        }
+
+        setTimeout(() => {
+            sndOpen.play();
+            for(let i=0; i<3; i++) document.getElementById(`door${i}`).classList.add('open');
+            
+            total++;
+            const win = (final === car);
+            let resultTxt = "";
+            
+            if(win) {
+                if(isSwitch) sWin++; else kWin++;
+                resultTxt = "Lựa chọn tuyệt vời! Bạn thắng ô tô thể thao!";
+                document.getElementById('msg').innerHTML = `<b style="color:var(--win)">🎉 ${resultTxt}</b>`;
+            } else {
+                resultTxt = "Rất tiếc, đằng sau là một chú lừa. Thử lại lượt sau nhé!";
+                document.getElementById('msg').innerHTML = `<b style="color:var(--accent)">🐐 ${resultTxt}</b>`;
+            }
+
+            speakAI(resultTxt);
+            document.getElementById('s-keep').innerText = kWin;
+            document.getElementById('s-switch').innerText = sWin;
+            document.getElementById('s-total').innerText = `${total}/10`;
+            
+            if(total < 10) {
+                document.getElementById('next-btn').style.display = 'inline-block';
+            } else {
+                showFinal();
+            }
+        }, 1200);
+    }
+
+    function showFinal() {
+        const summary = `Chúng ta đã hoàn thành show hôm nay. Hãy so sánh bảng thống kê để thấy sức mạnh của việc đổi cửa trong toán học nhé.`;
+        document.getElementById('msg').innerHTML = `<b>TRÒ CHƠI KẾT THÚC</b><br><small>${summary}</small>`;
+        speakAI(summary);
+    }
+</script>
+</body>
+</html>
